@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>LoRa_Receiver</name>
+	<name>LoRa_Receiver_STM32F411</name>
 	<comment></comment>
 	<projects>
 	</projects>
