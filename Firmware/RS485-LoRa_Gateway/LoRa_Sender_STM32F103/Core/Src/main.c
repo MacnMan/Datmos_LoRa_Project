@@ -24,6 +24,7 @@
 #include "LoRa.h"
 #include <string.h>
 #include <stdio.h>
+#include<math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
