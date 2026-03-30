@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "LoRa.h"
+#include "modbus_slave.h"
 #include <string.h>
 #include <stdio.h>
 /* USER CODE END Includes */
@@ -45,12 +46,19 @@
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 LoRa myLoRa;
 uint8_t read_data[128];
 int RSSI;
 volatile uint8_t lora_rx_flag = 0; // Flag to indicate data was received
+
+// -- Modbus Variables --
+uint8_t modbus_rx_buf[256];
+volatile uint16_t modbus_rx_idx = 0;
+volatile uint8_t modbus_frame_ready = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +66,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -98,8 +107,19 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
+
   /* USER CODE BEGIN 2 */
-  myLoRa = newLoRa();
+    // 1. Put MAX3485 into Receive Mode: PA0 = LOW
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+    // 2. Start listening for the first byte of Modbus frame via USART2 Interrupt
+    HAL_UART_Receive_IT(&huart2, &modbus_rx_buf[modbus_rx_idx], 1);
+
+    // 3. Enable the Idle Line interrupt for USART2 to detect end of Modbus frame
+    __HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
+
+  /* USER CODE BEGIN 2 */
+   myLoRa = newLoRa();
    myLoRa.hSPIx = &hspi1;
    myLoRa.CS_port = LoRa_NSS_GPIO_Port;
    myLoRa.CS_pin = LoRa_NSS_Pin;
@@ -145,7 +165,31 @@ while (1)
              int rssi = LoRa_getRSSI(&myLoRa);
              sprintf(uart_buf, "Received: %s | RSSI: %d dBm\r\n", read_data, rssi);
              HAL_UART_Transmit(&huart1, (uint8_t*)uart_buf, strlen(uart_buf), 100);
+
+             // ---> MODBUS MAPPING LOGIC <---
+                         // Assuming you receive up to 20 bytes of pure raw data that you want to share.
+                         // We pack the 20 bytes into our 10 Modbus Registers (16-bits each)
+            int regs_to_fill = size / 2;
+            if (regs_to_fill > NUM_HOLDING_REGISTERS) {
+                regs_to_fill = NUM_HOLDING_REGISTERS; // Protect against overflow
+            }
+            for (int i = 0; i < regs_to_fill; i++) {
+            // Merge two 8-bit bytes into one 16-bit register
+            Modbus_Holding_Registers[i] = (read_data[i*2] << 8) | read_data[(i*2)+1];
          }
+     }
+
+}
+// --- 2. HANDLE MODBUS PROCESSING ---
+      if (modbus_frame_ready == 1) {
+          modbus_frame_ready = 0; // Clear flag
+   // Process the received command (this function will automatically send the response)
+    // It is located inside modbus_slave.c
+          Process_Modbus_Request(modbus_rx_buf, modbus_rx_idx, &huart2);
+
+   // Reset buffer mechanics for next frame
+          modbus_rx_idx = 0;
+          HAL_UART_Receive_IT(&huart2, &modbus_rx_buf[modbus_rx_idx], 1);
      }
     /* USER CODE END WHILE */
 
@@ -271,6 +315,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -286,24 +363,32 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
+  /* Configure Pin PA0 as MODBUS RS485 DIR Output */
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LoRa_NSS_GPIO_Port, LoRa_NSS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, RS485_DIR_Pin|LoRa_NSS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(RESET_GPIO_Port, RESET_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : RS485_DIR_Pin LoRa_NSS_Pin */
+  GPIO_InitStruct.Pin = RS485_DIR_Pin|LoRa_NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LoRa_DIO0_Pin */
   GPIO_InitStruct.Pin = LoRa_DIO0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(LoRa_DIO0_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LoRa_NSS_Pin */
-  GPIO_InitStruct.Pin = LoRa_NSS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LoRa_NSS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : RESET_Pin */
   GPIO_InitStruct.Pin = RESET_Pin;
@@ -326,6 +411,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         lora_rx_flag = 1; // This is what wakes up your while(1) loop!
     }
 }
+
+// Automatically called when a single newly arriving byte is placed into the modbus_rx_buf array over USART2
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART2) {
+        // Step forward in array for next byte
+        modbus_rx_idx++;
+
+        // Listen for next single byte
+        HAL_UART_Receive_IT(&huart2, &modbus_rx_buf[modbus_rx_idx], 1);
+    }
+}
+
 /* USER CODE END 4 */
 
 /**

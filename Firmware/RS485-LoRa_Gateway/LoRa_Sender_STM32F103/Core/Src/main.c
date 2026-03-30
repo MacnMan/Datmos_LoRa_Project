@@ -191,15 +191,36 @@ while (1)
 		// 2. Clear old data from the array
 		memset(send_data, 0, sizeof(send_data));
 
-		uint8_t Tx_Buffer[8];
-		Tx_Buffer[0]=255;
-		Tx_Buffer[1]=255;
-		Tx_Buffer[2]=255;
-		Tx_Buffer[3]=255;
-		Tx_Buffer[4]=255;
-		Tx_Buffer[5]=255;
-		Tx_Buffer[6]=255;
-		Tx_Buffer[7]=255;
+		uint8_t Tx_Buffer[20];
+		Tx_Buffer[0] = 0;
+		Tx_Buffer[1] = 10;
+		// Register 1: Let's send the number 20
+		Tx_Buffer[2] = 0;
+		Tx_Buffer[3] = 20;
+		// Register 2: Let's send the number 30
+		Tx_Buffer[4] = 0;
+		Tx_Buffer[5] = 30;
+		// Register 3: Let's send the number 40
+		Tx_Buffer[6] = 0;
+		Tx_Buffer[7] = 40;
+		// Register 4: Let's send the number 50
+		Tx_Buffer[8] = 0;
+		Tx_Buffer[9] = 50;
+		// Register 5: Let's send the number 60
+		Tx_Buffer[10] = 0;
+		Tx_Buffer[11] = 60;
+		// Register 6: Let's send the number 70
+		Tx_Buffer[12] = 0;
+		Tx_Buffer[13] = 70;
+		// Register 7: Let's send the number 80
+		Tx_Buffer[14] = 0;
+		Tx_Buffer[15] = 80;
+		// Register 8: Let's send the number 90
+		Tx_Buffer[16] = 0;
+		Tx_Buffer[17] = 90;
+		// Register 9: Let's send the number 100
+		Tx_Buffer[18] = 0;
+		Tx_Buffer[19] = 100;
 
 		// 3. Insert the counter into your text message using '%d'
 		sprintf((char *)send_data, "Hello Form:");
@@ -208,7 +229,7 @@ while (1)
 		counter++;
 
 		// 5. Transmit the new string exactly at its size
-		LoRa_transmit(&myLoRa, Tx_Buffer, 8, 500);
+		LoRa_transmit(&myLoRa, Tx_Buffer, 20, 500);
 
 		HAL_Delay(5000); // Wait 1.5 seconds between sending
 

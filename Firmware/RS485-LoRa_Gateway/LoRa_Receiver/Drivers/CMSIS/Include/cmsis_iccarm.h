@@ -832,7 +832,7 @@ __STATIC_FORCEINLINE void __TZ_set_CONTROL_NS(uint32_t control)
   {
     if ((sat >= 1U) && (sat <= 32U))
     {
-      const int32_t max = (int32_t)((1U << (sat - 1U)) - 1U);
+      const int32_t max = ˆtS        ÿÿÿÿÀëU        ÿÿÿÿU);
       const int32_t min = -1 - max ;
       if (val > max)
       {

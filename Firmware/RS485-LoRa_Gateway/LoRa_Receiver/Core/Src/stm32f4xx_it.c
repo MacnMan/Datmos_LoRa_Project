@@ -57,8 +57,9 @@
 /* External variables --------------------------------------------------------*/
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
-
+extern volatile uint8_t modbus_frame_ready;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -239,6 +240,33 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 1 */
 
   /* USER CODE END USART1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles USART2 global interrupt.
+  */
+void USART2_IRQHandler(void)
+{
+	 // Check if the interrupt was caused by the UART line going IDLE (frame finished)
+	  if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE)) {
+
+	      // Clear the idle flag so the interrupt doesn't keep triggering
+	      __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+
+	      // Stop the single-byte receive process since the Modbus frame is fully received
+	      HAL_UART_AbortReceive_IT(&huart2);
+
+	      // Alert the main loop to process the Modbus frame
+	      modbus_frame_ready = 1;
+	  }
+
+	  /* USER CODE END USART2_IRQn 0 */
+
+	  HAL_UART_IRQHandler(&huart2);
+
+  /* USER CODE BEGIN USART2_IRQn 1 */
+
+  /* USER CODE END USART2_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

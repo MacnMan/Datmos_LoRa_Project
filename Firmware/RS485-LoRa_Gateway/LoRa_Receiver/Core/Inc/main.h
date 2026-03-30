@@ -57,6 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define RS485_DIR_Pin GPIO_PIN_0
+#define RS485_DIR_GPIO_Port GPIOA
 #define LoRa_DIO0_Pin GPIO_PIN_1
 #define LoRa_DIO0_GPIO_Port GPIOA
 #define LoRa_DIO0_EXTI_IRQn EXTI1_IRQn
