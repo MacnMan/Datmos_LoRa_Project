@@ -321,7 +321,11 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if(GPIO_Pin == myLoRa.DIO0_pin) {
+        lora_rx_flag = 1; // This is what wakes up your while(1) loop!
+    }
+}
 /* USER CODE END 4 */
 
 /**
